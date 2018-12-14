@@ -1,0 +1,10 @@
+name = "LatPhysLuttingerTisza"
+uuid = "91e24bd6-ff91-11e8-087a-05fe8a0f75ec"
+authors = ["Jan Attig <jattig@thp.Uni-Koeln.DE>"]
+version = "0.1.0"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
