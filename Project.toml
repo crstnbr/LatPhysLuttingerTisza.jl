@@ -8,3 +8,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test"]
+
+[deps]
+LatPhysBase = "eec5c15a-e8bd-11e8-0d23-6799ca40c963"
+LatPhysReciprocal = "7a511e88-ebe4-11e8-1bac-67d16a536c98"
