@@ -25,10 +25,45 @@ function newLTHamiltonian(
     return LTHamiltonian{L,U,HB}(unitcell, bond_hamiltonian)
 end
 
+
+
+# delta function for unitcell and bond
+function delta(
+        uc :: U,
+        b  :: B
+    ) :: Vector{Float64} where {L,N,S,B<:AbstractBond{L,N},U<:AbstractUnitcell{S,B}}
+
+    # build up the difference vector within the unitcell
+    d = point(site(uc,to(b))) .- point(site(uc,from(b)))
+    # add all the bravais lattice vectors
+    for i in 1:N
+        d .+= wrap(b)[i] .* latticeVectors(uc)[i]
+    end
+    # return the vector
+    return d
+end
+
+
+
 # function to obtain the Hamiltonian matrix at some k
 function getHamiltonianAtK(
         hamiltonian :: LTHamiltonian{L,U,HB},
         k :: Vector{<:Real}
-    ) :: Matrix{Complex} where {L,U,HB}
+    ) :: Matrix{Complex} where {L,NS,U,HB<:AbstractBondHamiltonian{L,NS}}
 
+    # new matrix
+    h = zeros(NS*numSites(hamiltonian.unitcell),NS*numSites(hamiltonian.unitcell))
+
+    # add all bonds to the matrix
+    for b in bonds(hamiltonian.unitcell)
+        # get the bond indices
+        i_from  = from(b)
+        i_to    = to(b)
+        delta_r = delta(hamiltonian.unitcell, b)
+        # get the interaction matrix and add it to the general matrix
+        h[i_from:i_from+NS-1, i_to:i_to+NS-1] .+= bondterm(hamiltonian.h_bond, b) .* exp(im*dot(k,delta_r))
+    end
+
+    # return the matrix
+    return h
 end
