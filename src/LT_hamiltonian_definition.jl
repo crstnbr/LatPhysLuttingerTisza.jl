@@ -46,7 +46,7 @@ end
 
 
 # function to obtain the Hamiltonian matrix at some k
-function getHamiltonianAtK(
+function getMatrixAtK(
         hamiltonian :: LTHamiltonian{L,U,HB},
         k :: Vector{<:Real}
     ) :: Matrix{Complex} where {L,NS,U,HB<:AbstractBondHamiltonian{L,NS}}
