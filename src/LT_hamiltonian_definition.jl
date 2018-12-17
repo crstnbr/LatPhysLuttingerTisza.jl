@@ -52,7 +52,7 @@ function getMatrixAtK(
     ) :: Matrix{Complex} where {L,NS,U,HB<:AbstractBondHamiltonian{L,NS}}
 
     # new matrix
-    h = zeros(NS*numSites(hamiltonian.unitcell),NS*numSites(hamiltonian.unitcell))
+    h = zeros(Complex, NS*numSites(hamiltonian.unitcell),NS*numSites(hamiltonian.unitcell))
 
     # add all bonds to the matrix
     for b in bonds(hamiltonian.unitcell)
@@ -61,7 +61,7 @@ function getMatrixAtK(
         i_to    = to(b)
         delta_r = delta(hamiltonian.unitcell, b)
         # get the interaction matrix and add it to the general matrix
-        h[i_from:i_from+NS-1, i_to:i_to+NS-1] .+= bondterm(hamiltonian.h_bond, b) .* exp(im*dot(k,delta_r))
+        h[(i_from-1)*(NS)+1:(i_from)*(NS), (i_to-1)*(NS)+1:(i_to)*(NS)] .+= bondterm(hamiltonian.h_bond, b) .* exp(im*dot(k,delta_r))
     end
 
     # return the matrix
