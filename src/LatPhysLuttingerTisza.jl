@@ -40,10 +40,6 @@ using LatPhysBase
 using LatPhysReciprocal
 using LinearAlgebra
 
-
-
-
-
 # Definition of Hamiltonians (only for calculations)
 include("LT_hamiltonian_definition.jl")
 include("LatPhysLTGroundstateKSpace.jl")
