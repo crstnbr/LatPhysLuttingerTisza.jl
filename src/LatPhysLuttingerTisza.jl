@@ -42,7 +42,8 @@ using LinearAlgebra
 
 # Definition of Hamiltonians (only for calculations)
 include("LT_hamiltonian_definition.jl")
-include("LatPhysLTGroundstateKSpace.jl")
+include("LT_groundstate_k_space.jl")
+include("LT_groundstate_plotting.jl")
 
 
 

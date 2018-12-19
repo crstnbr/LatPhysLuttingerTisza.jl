@@ -6,19 +6,22 @@
 
 struct LTGroundstate
 
-    # the minimal energy modes 
-    modes :: Vector{Vector{Float64}}
+    # the minimal energy 
+    E_min :: Float64
+
+    # the k_vectors with minimal energy
+    k_vectors :: Matrix{Float64}
 
     # their respective constraint values
-    constraints :: Vector{Float64} 
+    constraint_values :: Vector{Float64} 
 
 end
 
-# function to compute energy from LT interaction matrix
+# function determine the energy of a k_vector for a given LT hamiltonian
 function energy(
     hamiltonian :: LTHamiltonian{L,U,HB},
     k :: Vector{Float64}
-) :: Float64 where {L,NS,U,HB<:AbstractBondHamiltonian{L,NS}}
+    ) :: Float64 where {L,NS,U,HB<:AbstractBondHamiltonian{L,NS}}
 
     # first compute the matrix at the given k 
     M_k = getMatrixAtK(hamiltonian, k)
@@ -28,136 +31,190 @@ function energy(
 
 end 
 
-# function to compute deviation
-function deviation(
+# function to compute the hard spin constraint
+function constraintFunction(
     k :: Vector{Float64},
-    eigenvectors :: Vector{Vector{Complex}},
+    eigenvectors :: Vector{Vector{Float64}},
+    alpha :: Vector{Float64},
     sites :: Vector{S},
-    d_spin :: Int64,
-    alpha :: Vector{Float64}
-) :: Float64 where {L, D, S <: AbstractSite{L, D}}
+    d_spin :: Int64
+    ) :: Float64 where {L<:Integer,D,S<:AbstractSite{L, D}}
 
     d_eig   = length(eigenvectors)
     N_sites = length(sites)
 
     sum = 0
 
+    # iterate over all sites in the lattice
     for r in 1 : N_sites
 
         site  = sites[r]
-        label = site.label 
-        pos   = site.point
+        index = label(site) 
+        pos   = point(site)
 
-        spin_vector = zeros(Float64, d_eig)
+        spin_vector = zeros(Float64, d_spin)
         product     = dot(pos, k)
 
+        # iterate over the (degenerate) subset of eigenvectors with minimal energy for vector k
         for s in 1 : d_eig
-            spin_vector .+= (alpha[s] * cos(product) + alpha[s + d_eig] * sin(product)) * eigenvectors[s][d_spin * (label - 1) + 1 : d_spin * label]
+            spin_vector .+= (alpha[s] * cos(product) + alpha[s + d_eig] * sin(product)) * eigenvectors[s][d_spin * (index - 1) + 1 : d_spin * index]
         end
 
-        sum += abs(norm(spin_vector) - 1)
+        # compute deviation from unit length
+        sum += abs(norm(spin_vector) - 1.0)
 
     end
 
+    # average over all sites
     return sum / N_sites
 
 end
 
-# function to minimize the constraint
-function getLTConstraint(
+# function to compute the constraint for a given k on a finite lattice
+function computeConstraint(
     k :: Vector{Float64},
-    eigenvectors :: Vector{Vector{Complex}},
-    sites :: Vector{S}
-) :: Float64 where {L, D, S <: AbstractSite{L, D}}
+    hamiltonian :: LTHamiltonian{L,U,HB},
+    sites :: Vector{S},
+    d_spin :: Int64
+    ) :: Float64 where {L<:Integer,NS,U,HB<:AbstractBondHamiltonian{L,NS},D,S<:AbstractSite{L, D}}
 
-    alpha = zeros(2 * length(eigenvectors))
-    constraint = Optim.minimum(Optim.optimize(x->deviation(k, eigenvectors, sites, d_spin, x), alpha))
+    # compute the interaction matrix
+    M_k = getMatrixAtK(hamiltonian, k)
 
-    return constraint
+    # diagonalize it
+    eigenfactorization = eigen(M_k)
+    eigenvalues        = real(eigenfactorization.values)
+    eigenvectors       = real(eigenfactorization.vectors) 
+
+    # get (degenerate) subset of minimal energy eigenvectors
+    E_min      = minimum(eigenvalues)
+    deviations = [abs(E_min - E) for E in eigenvalues]
+    degenerate = collect(1 : length(eigenvalues))[deviations .<= 1e-10]
+
+    # minimize the constraint on the lattice
+    alpha            = ones(2 * length(eigenvectors))
+    constraint_value = Optim.minimum(Optim.optimize(x->constraintFunction(k, [eigenvectors[:, i] for i in degenerate], x, sites, d_spin), alpha, NelderMead(), Optim.Options(iterations = 10000)))
+
+    return constraint_value
 
 end
 
-function getLTConstraintDetailed(spin_eigenvectors::Array{Array{Complex{Float64},1},1}, spin_dimension::Int64, lattice_vectors::Array{Array{Float64,1},1}, momentum_vector::Array{Float64, 1})
+# function to compute the groundstate given a mesh of random k_vectors and connections between high symmetry points
+function getLTGroundstateKSpace(
+    N_random :: Int64,
+    symmetric_k_vectors :: Vector{Vector{Float64}},
+    hamiltonian :: LTHamiltonian{L,U,HB},
+    sites :: Vector{S},
+    ruc :: RU,
+    d_spin :: Int64
+    ;
+    epsilon :: Float64 = 1e-10,
+    epsilon_k :: Float64 = 1e-10,
+    groundstate_energy :: Float64 = Inf
+    ) :: LTGroundstate where {L<:Integer,NS,U,HB<:AbstractBondHamiltonian{L,NS},D,S<:AbstractSite{L, D}, P,B,RU<:AbstractReciprocalUnitcell{P, B}}
 
-    full_size = length(spin_eigenvectors[1])
-    eigenspace_dimension = length(spin_eigenvectors)
-    alpha = zeros(2 * eigenspace_dimension)
-    res = Optim.optimize(x->spatial_deviation(spin_eigenvectors, full_size, spin_dimension, eigenspace_dimension, lattice_vectors, momentum_vector, x), alpha, NelderMead(),
-    Optim.Options(iterations = 10000))
+    d_spatial    = length(point(sites[1]))
+    bounds_lower = -2 * pi .* ones(Float64, d_spatial)
+    bounds_upper = 2 * pi .* ones(Float64, d_spatial)
 
-    constraint_value = Optim.minimum(res)
-    parameters = Optim.minimizer(res)
+    # size of the symmetric mesh
+    N_symmetric = length(symmetric_k_vectors)
 
-    return constraint_value, parameters
-
-end
-
-function ComputeConstraint(
-    momentum_vector::Array{Float64, 1},
-    unitcell::Unitcell,
-    lattice_vectors::Array{Array{Float64,1},1},
-    spin_dimension::Int64,
-    epsilon_degenerate::Float64,
-    bondInteractionMatrix::Function=getBondInteractionMatrixHeisenberg)
-
-    LT_constraint = 0
-
-    matrix = getSpinInteractionMatrixKSpace(unitcell, momentum_vector, bondInteractionMatrix)
-
-    if size(matrix) == (1,1)
-
-        return LT_constraint
-
-    else
-
-        eigenfactorization = eigfact(matrix)
-        eigenvalues  = eigenfactorization[:values]
-        eigenvectors = eigenfactorization[:vectors]
-
-        degenerate = zeros(Int64,   length(eigenvalues)) .- 1
-        treat      =  ones(Int64,   length(eigenvalues))
-
-        for b in 2:length(eigenvalues)
-
-            if eigenvalues[b] - epsilon_degenerate <= eigenvalues[b-1]
-
-                degenerate[b-1] = b
-                treat[b] = 0
-
+    # check if the GS energy has to be calculated
+    if groundstate_energy == Inf
+        # search for 10 random points and compare the found minimum
+        for tries in 1 : 10
+            # find a suitable starting point for the Newton algorithm
+            k_start = Float64[rand() for i in 1 : d_spatial]
+            for j in 1 : d_spatial
+                k_start[j] = k_start[j] * bounds_lower[j] + (1 - k_start[j]) * bounds_upper[j]
             end
-
+            # optimize the energy
+            groundstate_energy = min(Optim.minimum(Optim.optimize(x->energy(hamiltonian, x), k_start)), groundstate_energy)
         end
-
-        treated_first = false
-        for b in 1:length(eigenvalues)
-
-            if treat[b] == 0
-
-                continue
-
-            elseif treated_first
-
-                break
-
-            end
-
-            degenerate_bands = Int64[b]
-            while degenerate[degenerate_bands[end]] != -1
-
-                push!(degenerate_bands, degenerate[degenerate_bands[end]])
-
-            end
-
-            LT_constraint = getLTConstraint([eigenvectors[:,j] for j in degenerate_bands], spin_dimension, lattice_vectors, momentum_vector)
-            treated_first = true
-
-        end
-
-        return LT_constraint
-
+        # print the groundstate_energy
+        println("Groundstate energy is E_min = $(groundstate_energy)")
     end
 
+    # initialize random points, minimize their energies and fold back to first BZ
+    function dE(k :: Vector{Float64}) :: Float64
+        M_k = getMatrixAtK(hamiltonian, k)
+        eigenvalues = eigvals(M_k) .- groundstate_energy
+        return minimum(eigenvalues .* eigenvalues)
+    end
+
+    random_k_vectors = zeros(Float64, N_random, d_spatial)
+    index = 1
+    while index <= N_random
+        k = Float64[rand() for i in 1 : d_spatial]
+        # start with the initial energy
+        e0 = dE(k)
+         # iterate i over 100 newton steps (maximum)
+        for i in 1 : 100
+            # check if the energy is already converged
+            if e0 < epsilon
+                # fold back to 1.BZ and save the k vector
+                random_k_vectors[index, :] = shiftToFirstBZ(ruc, k)
+                # increment the index 
+                index += 1
+                # break the newton loop
+                break
+            end
+            # the current energy
+            H_0 = e0
+            # the gradient of the energy
+            H_eps = zeros(Float64, d_spatial)
+            for j in 1 : d_spatial 
+                shift = zeros(Float64, d_spatial)
+                shift[j] = epsilon_k 
+                H_eps[j] = dE(k .+ shift)
+            end
+            dH = (H_eps .- H_0) ./ epsilon_k
+            # absolute value of the gradient
+            dHdH = dot(dH, dH)
+            # break the Newton loop if the gradient diverges or is flattened too much
+            if abs(dHdH) < 1e-20 || abs(dHdH) > 1e20
+                break
+            end
+            # increment k
+            dk = dH * (H_0 / dHdH)
+            k -= dk
+            # calculate a new energy
+            e0 = dE(k)
+        end
+    end
+
+    # check which points in the symmetric mesh also have minimal energy
+    symmetric_k_vectors_min = Vector{Float64}[]
+    for i in 1 : N_symmetric 
+        k = symmetric_k_vectors[i]
+        if abs(energy(hamiltonian, k) - groundstate_energy) < epsilon
+            push!(symmetric_k_vectors_min, k)
+        end 
+    end 
+
+    # iterate over all points and determine the contraint 
+    N_symmetric        = length(symmetric_k_vectors_min)
+    N_total            = N_random + N_symmetric 
+    k_vectors          = zeros(Float64, N_total, d_spatial)
+    constraint_values  = zeros(Float64, N_total)
+    for i in 1 : N_total 
+        if i <= N_random 
+            k                    = random_k_vectors[i, :]
+            constraint_values[i] = computeConstraint(k, hamiltonian, sites, d_spin)
+            k_vectors[i, :]      = k
+        else 
+            k                    = symmetric_k_vectors_min[i - N_random]
+            constraint_values[i] = computeConstraint(k, hamiltonian, sites, d_spin)
+            k_vectors[i, :]      = k 
+        end 
+    end 
+
+    # return LTGroundstate 
+    return LTGroundstate(groundstate_energy, k_vectors, constraint_values)
+
 end
 
 
 
+    
