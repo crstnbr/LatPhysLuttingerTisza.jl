@@ -44,9 +44,9 @@ end
 
 # get random points inside a box
 function getPointsRandomInBox(
+            N           :: Integer,
             center      :: Vector{<:Real},
-            dimensions  :: Vector{<:Real},
-            N           :: Integer
+            dimensions  :: Vector{<:Real}
         )
 
     # the list of points to return later
@@ -63,6 +63,28 @@ function getPointsRandomInBox(
         points[i] .-= 1
         points[i] .*= dimensions
         points[i] .+= center
+    end
+
+    # return the array of points
+    return points
+end
+
+# get random points inside a convex hull of some points
+function getPointsRandomInConvexHull(
+            N             :: Integer,
+            anchor_points :: Vector{<:Real}...
+        )
+
+    # the list of points to return later
+    points = Vector{Vector{Float64}}(undef, N)
+
+    # set all points
+    for i in 1:N
+        # set the point to a random point
+        alphas = rand(Float64,length(anchor_points))
+        alphas ./= sum(alphas)
+        # shift the point into the box
+        points[i] = sum(anchor_points .* alphas)
     end
 
     # return the array of points
@@ -106,7 +128,8 @@ function getPointsHighSymmetryMesh(
             include_lines_in_faces :: Bool       = true,
             include_lines_to_face_center :: Bool = true,
             include_lines_to_gamma :: Bool       = true,
-            include_random_face_points :: Bool   = true
+            include_random_face_points :: Bool   = true,
+            face_resolution :: Integer = 100
         ) :: Vector{Vector{Float64}} where {D,B, P<:AbstractReciprocalPoint{D}, R<:AbstractReciprocalUnitcell{P,B}, BZ<:AbstractBrillouinZone{R}}
 
     # get the gamma point
@@ -212,6 +235,14 @@ function getPointsHighSymmetryMesh(
                 for p in line
                     push!(mesh, p)
                 end
+            end
+        end
+
+        # INCLUDE FACE POINTS RANDOMLY SAMPLED
+        if include_random_face_points
+            points = getPointsRandomInConvexHull(face_resolution, corners...)
+            for p in points
+                push!(mesh, p)
             end
         end
 
