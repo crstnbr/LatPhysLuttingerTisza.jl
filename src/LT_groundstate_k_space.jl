@@ -6,14 +6,14 @@
 
 struct LTGroundstate
 
-    # the minimal energy 
+    # the minimal energy
     E_min :: Float64
 
     # the k_vectors with minimal energy, columns correspond to components
     k_vectors :: Matrix{Float64}
 
     # their respective constraint values
-    constraint_values :: Vector{Float64} 
+    constraint_values :: Vector{Float64}
 
 end
 
@@ -23,13 +23,13 @@ function energy(
     k :: Vector{Float64}
     ) :: Float64 where {L,NS,U,HB<:AbstractBondHamiltonian{L,NS}}
 
-    # first compute the matrix at the given k 
+    # first compute the matrix at the given k
     M_k = getMatrixAtK(hamiltonian, k)
 
-    # return minimal eigenvalue 
+    # return minimal eigenvalue
     return eigmin(M_k)
 
-end 
+end
 
 # function to compute the hard spin constraint
 function constraintFunction(
@@ -50,7 +50,7 @@ function constraintFunction(
     for r in 1 : N_sites
 
         site  = sites[r]
-        index = label(site) 
+        index = label(site)
         pos   = point(site)
 
         spin_vector = zeros(Float64, d_spin)
@@ -85,7 +85,7 @@ function computeConstraint(
     # diagonalize it
     eigenfactorization = eigen(M_k)
     eigenvalues        = real(eigenfactorization.values)
-    eigenvectors       = real(eigenfactorization.vectors) 
+    eigenvectors       = real(eigenfactorization.vectors)
 
     # get (degenerate) subset of minimal energy eigenvectors
     E_min      = minimum(eigenvalues)
@@ -105,24 +105,24 @@ struct Plaquette
 
     # corners of the plaquette (these are obtained from a BZ object)
     corners :: Vector{Vector{Float64}}
- 
+
     # center of the plaquette
     center :: Vector{Float64}
- 
+
     # edgepoints of the plaquette
     edges :: Vector{Vector{Float64}}
 
 end
- 
-# find nearest neighbors of one vertex in a list vertices 
+
+# find nearest neighbors of one vertex in a list vertices
 function getClosest(
-    index :: Int64, 
+    index :: Int64,
     vertices :: Vector{Vector{Float64}}
     ) :: Vector{Float64}
 
     N_vertices = length(vertices)
     distances = Vector{Float64}(undef, N_vertices)
- 
+
     for i in 1 : N_vertices
        if i == index
           distances[i] = Inf
@@ -130,9 +130,9 @@ function getClosest(
           distances[i] = norm(vertices[index] .- vertices[i])
        end
     end
- 
+
     index_min = findmin(distances)[2]
- 
+
     return vertices[index_min]
 
 end
@@ -145,13 +145,13 @@ function getFarthest(
 
     N_vertices = length(vertices)
     distances = Vector{Float64}(undef, N_vertices)
- 
+
     for i in 1 : N_vertices
           distances[i] = norm(vertices[index] .- vertices[i])
     end
- 
+
     index_max = findmax(distances)[2]
- 
+
     return vertices[index_max]
 
 end
@@ -165,7 +165,7 @@ function getCenter(
     ref_vertex = vertices[ref_index]
     vertex_farthest = getFarthest(ref_index, vertices)
     center = ref_vertex .+ 0.5 * (vertex_farthest .- ref_vertex)
- 
+
     return center
 
 end
@@ -177,12 +177,12 @@ function getEdges(
 
     N_vertices = length(vertices)
     edges = Vector{Vector{Float64}}(undef, N_vertices)
- 
+
     for i in 1 : N_vertices
        vertex_closest = getClosest(i, vertices)
        edges[i] = vertices[i] .+ 0.5 * (vertex_closest .- vertices[i])
     end
- 
+
     return edges
 
 end
@@ -195,25 +195,25 @@ function buildPlaquette(
     corners = vertices
     center = getCenter(vertices)
     edges = getEdges(vertices)
- 
+
     return Plaquette(corners, center, edges)
 
 end
 
 # contruct line between vertices with a certain resolution
 function buildLine(
-    vertex1 :: Vector{Float64}, 
-    vertex2 :: Vector{Float64}, 
+    vertex1 :: Vector{Float64},
+    vertex2 :: Vector{Float64},
     resolution :: Int64
     ) :: Vector{Vector{Float64}}
 
     line = Vector{Vector{Float64}}(undef, resolution + 1)
     spacing = 1 / resolution
- 
+
     for i in 0 : resolution
        line[i + 1] = vertex1 .+ i * spacing * (vertex2 .- vertex1)
     end
- 
+
     return line
 
 end
@@ -227,7 +227,7 @@ function buildHighSymmetryMesh(
     d_spatial = length(corners(bz)[1])
     origin = zeros(Float64, d_spatial)
     mesh = []
- 
+
     # first build all plaquettes
     N_p = length(faces(bz))
     Plaquettes = Vector{Plaquette}(undef, N_p)
@@ -278,10 +278,10 @@ function buildHighSymmetryMesh(
           end
        end
     end
- 
+
     # remove redundant points
     mesh = unique(mesh)
- 
+
     return mesh
 
 end
@@ -295,7 +295,7 @@ function getLTGroundstateKSpace(
     ruc :: RU
     ;
     initial_tries :: Int64 = 10,
-    d_spin :: Int64 = 3, 
+    d_spin :: Int64 = 3,
     epsilon :: Float64 = 1e-6,
     epsilon_k :: Float64 = 1e-10,
     groundstate_energy :: Float64 = Inf
@@ -351,7 +351,7 @@ function getLTGroundstateKSpace(
             if e0 < epsilon
                 # fold back to 1.BZ and save the k vector
                 random_k_vectors[index, :] = shiftToFirstBZ(ruc, k)
-                # increment the index 
+                # increment the index
                 index += 1
                 # break the newton loop
                 break
@@ -360,9 +360,9 @@ function getLTGroundstateKSpace(
             H_0 = e0
             # the gradient of the energy
             H_eps = zeros(Float64, d_spatial)
-            for j in 1 : d_spatial 
+            for j in 1 : d_spatial
                 shift = zeros(Float64, d_spatial)
-                shift[j] = epsilon_k 
+                shift[j] = epsilon_k
                 H_eps[j] = dE(k .+ shift)
             end
             dH = (H_eps .- H_0) ./ epsilon_k
@@ -382,35 +382,31 @@ function getLTGroundstateKSpace(
 
     # check which points in the symmetric mesh also have minimal energy
     symmetric_k_vectors_min = Vector{Float64}[]
-    for i in 1 : N_symmetric 
+    for i in 1 : N_symmetric
         k = symmetric_k_vectors[i]
         if abs(energy(hamiltonian, k) - groundstate_energy) <= epsilon
             push!(symmetric_k_vectors_min, k)
-        end 
-    end 
+        end
+    end
 
-    # iterate over all points and compute the contraint 
+    # iterate over all points and compute the contraint
     N_symmetric        = length(symmetric_k_vectors_min)
-    N_total            = N_random + N_symmetric 
+    N_total            = N_random + N_symmetric
     k_vectors          = zeros(Float64, N_total, d_spatial)
     constraint_values  = zeros(Float64, N_total)
-    for i in 1 : N_total 
-        if i <= N_random 
+    for i in 1 : N_total
+        if i <= N_random
             k                    = random_k_vectors[i, :]
             constraint_values[i] = computeConstraint(k, hamiltonian, sites, d_spin)
             k_vectors[i, :]      = k
-        else 
+        else
             k                    = symmetric_k_vectors_min[i - N_random]
             constraint_values[i] = computeConstraint(k, hamiltonian, sites, d_spin)
-            k_vectors[i, :]      = k 
-        end 
-    end 
+            k_vectors[i, :]      = k
+        end
+    end
 
-    # return LTGroundstate 
+    # return LTGroundstate
     return LTGroundstate(groundstate_energy, k_vectors, constraint_values)
 
 end
-
-
-
-    
