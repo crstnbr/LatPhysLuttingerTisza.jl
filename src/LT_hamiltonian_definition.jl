@@ -1,3 +1,8 @@
+################################################################################
+#
+#   DEFINITION OF LT HAMILTONIAN (STRUCT ONLY FOR COMPUTATION)
+#
+################################################################################
 struct LTHamiltonian{
         L,
         U<:AbstractUnitcell{S,B} where {S, B<:AbstractBond{L,N} where {N}},
@@ -27,7 +32,7 @@ end
 
 
 
-# delta function for unitcell and bond
+# delta function for unitcell and bond to compute the displacement vector of the bond
 function delta(
         uc :: U,
         b  :: B
@@ -66,4 +71,19 @@ function getMatrixAtK(
 
     # return the matrix
     return h
+end
+
+
+
+# function determine the energy of a k_vector for a given LT hamiltonian
+function energy(
+            hamiltonian :: LTHamiltonian{L,U,HB},
+            k           :: Vector{Float64}
+        ) :: Float64 where {L,NS,U,HB<:AbstractBondHamiltonian{L,NS}}
+
+    # first compute the matrix at the given k
+    M_k = getMatrixAtK(hamiltonian, k)
+
+    # return the minimal eigenvalue
+    return eigmin(M_k)
 end

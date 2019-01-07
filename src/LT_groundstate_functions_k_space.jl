@@ -1,35 +1,8 @@
 ################################################################################
 #
-#   definition of Luttinger-Tisza ground state in k-space
+#   CONSTRAINT RELATED
 #
 ################################################################################
-
-struct LTGroundstate
-
-    # the minimal energy
-    E_min :: Float64
-
-    # the k_vectors with minimal energy, columns correspond to components
-    k_vectors :: Matrix{Float64}
-
-    # their respective constraint values
-    constraint_values :: Vector{Float64}
-
-end
-
-# function determine the energy of a k_vector for a given LT hamiltonian
-function energy(
-    hamiltonian :: LTHamiltonian{L,U,HB},
-    k :: Vector{Float64}
-    ) :: Float64 where {L,NS,U,HB<:AbstractBondHamiltonian{L,NS}}
-
-    # first compute the matrix at the given k
-    M_k = getMatrixAtK(hamiltonian, k)
-
-    # return minimal eigenvalue
-    return eigmin(M_k)
-
-end
 
 # function to compute the hard spin constraint
 function constraintFunction(
@@ -100,205 +73,33 @@ function computeConstraint(
 
 end
 
-# introdcue plaquette as new struct from which a mesh connecting high symmetry points is constructed
-struct Plaquette
 
-    # corners of the plaquette (these are obtained from a BZ object)
-    corners :: Vector{Vector{Float64}}
 
-    # center of the plaquette
-    center :: Vector{Float64}
 
-    # edgepoints of the plaquette
-    edges :: Vector{Vector{Float64}}
 
-end
 
-# find nearest neighbors of one vertex in a list vertices
-function getClosest(
-    index :: Int64,
-    vertices :: Vector{Vector{Float64}}
-    ) :: Vector{Float64}
 
-    N_vertices = length(vertices)
-    distances = Vector{Float64}(undef, N_vertices)
 
-    for i in 1 : N_vertices
-       if i == index
-          distances[i] = Inf
-       else
-          distances[i] = norm(vertices[index] .- vertices[i])
-       end
-    end
+################################################################################
+#
+#   GENERAL FUNCTION
+#
+################################################################################
 
-    index_min = findmin(distances)[2]
-
-    return vertices[index_min]
-
-end
-
-# find farthest vertex given one vertex in a list of vertices
-function getFarthest(
-    index :: Int64,
-    vertices :: Vector{Vector{Float64}}
-    ) :: Vector{Float64}
-
-    N_vertices = length(vertices)
-    distances = Vector{Float64}(undef, N_vertices)
-
-    for i in 1 : N_vertices
-          distances[i] = norm(vertices[index] .- vertices[i])
-    end
-
-    index_max = findmax(distances)[2]
-
-    return vertices[index_max]
-
-end
-
-# compute the center as half the diagonal from a set of vertices forming a BZ surface
-function getCenter(
-    vertices :: Vector{Vector{Float64}}
-    ) :: Vector{Float64}
-
-    ref_index = 1
-    ref_vertex = vertices[ref_index]
-    vertex_farthest = getFarthest(ref_index, vertices)
-    center = ref_vertex .+ 0.5 * (vertex_farthest .- ref_vertex)
-
-    return center
-
-end
-
-# compute edges as half the displacement from neighbor vertex
-function getEdges(
-    vertices :: Vector{Vector{Float64}}
-    ) :: Vector{Vector{Float64}}
-
-    N_vertices = length(vertices)
-    edges = Vector{Vector{Float64}}(undef, N_vertices)
-
-    for i in 1 : N_vertices
-       vertex_closest = getClosest(i, vertices)
-       edges[i] = vertices[i] .+ 0.5 * (vertex_closest .- vertices[i])
-    end
-
-    return edges
-
-end
-
-# constructor for struct plaquette
-function buildPlaquette(
-    vertices :: Vector{Vector{Float64}}
-    ) :: Plaquette
-
-    corners = vertices
-    center = getCenter(vertices)
-    edges = getEdges(vertices)
-
-    return Plaquette(corners, center, edges)
-
-end
-
-# contruct line between vertices with a certain resolution
-function buildLine(
-    vertex1 :: Vector{Float64},
-    vertex2 :: Vector{Float64},
-    resolution :: Int64
-    ) :: Vector{Vector{Float64}}
-
-    line = Vector{Vector{Float64}}(undef, resolution + 1)
-    spacing = 1 / resolution
-
-    for i in 0 : resolution
-       line[i + 1] = vertex1 .+ i * spacing * (vertex2 .- vertex1)
-    end
-
-    return line
-
-end
-
-# contructor for symmetric mesh
-function buildHighSymmetryMesh(
-    bz :: BZ,
-    resolution :: Int64
-    ) :: Vector{Vector{Float64}} where {R, BZ<:AbstractBrillouinZone{R}}
-
-    d_spatial = length(corners(bz)[1])
-    origin = zeros(Float64, d_spatial)
-    mesh = []
-
-    # first build all plaquettes
-    N_p = length(faces(bz))
-    Plaquettes = Vector{Plaquette}(undef, N_p)
-    for i in 1 : N_p
-        face = faces(bz)[i]
-        N_f = length(face)
-        vertices = Vector{Vector{Float64}}(undef, N_f)
-        for j in 1 : N_f
-            vertices[j] = corners(bz)[face[j]]
-        end
-        Plaquettes[i] = buildPlaquette(vertices)
-    end
-
-    # now construct the mesh
-    for plaquette in Plaquettes
-       # unwrap plaquette
-       corners = plaquette.corners
-       center = plaquette.center
-       edges = plaquette.edges
-       # add connections from origin to corners, between corners and from center to corners
-       for i in 1 : length(corners)
-          for point in buildLine(corners[i], origin, resolution)
-             push!(mesh, point)
-          end
-          corner_closest = getClosest(i, corners)
-          for point in buildLine(corners[i], corner_closest, resolution)
-             push!(mesh, point)
-          end
-          for point in buildLine(corners[i], center, resolution)
-             push!(mesh, point)
-          end
-       end
-       # add connection from origin to center
-       for point in buildLine(center, origin, resolution)
-          push!(mesh, point)
-       end
-       # add connections from orgin to edges, between edges and from edges to center
-       for i in 1 : length(edges)
-          for point in buildLine(edges[i], origin, resolution)
-             push!(mesh, point)
-          end
-          edge_closest = getClosest(i, edges)
-          for point in buildLine(edges[i], edge_closest, resolution)
-             push!(mesh, point)
-          end
-          for point in buildLine(edges[i], center, resolution)
-             push!(mesh, point)
-          end
-       end
-    end
-
-    # remove redundant points
-    mesh = unique(mesh)
-
-    return mesh
-
-end
 
 # function to compute the groundstate given a mesh of random k_vectors and connections between high symmetry points
 function getLTGroundstateKSpace(
-    N_random :: Int64,
-    symmetric_k_vectors :: Vector{Vector{Float64}},
-    hamiltonian :: LTHamiltonian{L,U,HB},
-    sites :: Vector{S},
-    ruc :: RU
-    ;
-    initial_tries :: Int64 = 10,
-    d_spin :: Int64 = 3,
-    epsilon :: Float64 = 1e-6,
-    epsilon_k :: Float64 = 1e-10,
-    groundstate_energy :: Float64 = Inf
+        N_random :: Int64,
+        symmetric_k_vectors :: Vector{Vector{Float64}},
+        hamiltonian :: LTHamiltonian{L,U,HB},
+        sites :: Vector{S},
+        ruc :: RU
+        ;
+        initial_tries :: Int64 = 10,
+        d_spin :: Int64 = 3,
+        epsilon :: Float64 = 1e-6,
+        epsilon_k :: Float64 = 1e-10,
+        groundstate_energy :: Float64 = Inf
     ) :: LTGroundstate where {L<:Integer,NS,U,HB<:AbstractBondHamiltonian{L,NS},D,S<:AbstractSite{L, D}, P,B,RU<:AbstractReciprocalUnitcell{P, B}}
 
     d_spatial    = length(point(sites[1]))
