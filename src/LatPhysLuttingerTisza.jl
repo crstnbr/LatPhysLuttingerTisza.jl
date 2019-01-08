@@ -40,15 +40,6 @@ using LatPhysBase
 using LatPhysReciprocal
 using LinearAlgebra
 
-# Definition of Hamiltonians (only for calculations)
-include("LT_hamiltonian_definition.jl")
-# Definition of ground state objects
-include("LT_groundstate_definition.jl")
-
-# functions to compute ground state objects in k space
-include("LT_groundstate_functions_k_space.jl")
-
-
 
 # end of module
 end

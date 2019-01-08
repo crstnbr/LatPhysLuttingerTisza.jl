@@ -1,6 +1,9 @@
 ################################################################################
 #
 #   DEFINITION OF LT HAMILTONIAN (STRUCT ONLY FOR COMPUTATION)
+#   - label type L (of bond labels)
+#   - unitcell type U<:AbstractUnitcell{S,B} where {S, B<:AbstractBond{L,N} where {N}},
+#   - bond hamiltonian type HB<:AbstractBondHamiltonian{L,NS} where {NS}
 #
 ################################################################################
 struct LTHamiltonian{
