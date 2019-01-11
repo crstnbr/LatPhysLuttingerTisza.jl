@@ -22,7 +22,7 @@ abstract type AbstractLTState end
 
 function eigenvectors(lts) end
 function alphas(lts) end
-function spinconfiguration(lts, lattice, u, v) :: LTSpinConfiguration{N,L} end
+function spinconfiguration(lts, lattice, u=[1,0,0], v=[0,1,0]) :: LTSpinConfiguration{N,L} end
 
 mutable struct LTState <: AbstractLTState
     eigenvectors :: Vector{Vector{Float64}}
