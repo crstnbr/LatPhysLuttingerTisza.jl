@@ -1,0 +1,30 @@
+[[LatPhysBase]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "2af1faa0ce74d66096a2421832db3cc179a22996"
+repo-rev = "master"
+repo-url = "https://github.com/janattig/LatPhysBase.jl"
+uuid = "eec5c15a-e8bd-11e8-0d23-6799ca40c963"
+version = "0.1.0"
+
+[[LatPhysLatticeConstruction]]
+deps = ["LatPhysBase"]
+git-tree-sha1 = "c30265654777ec4d341b7308228156c8ab8ff22f"
+repo-rev = "master"
+repo-url = "https://github.com/janattig/LatPhysLatticeConstruction.jl"
+uuid = "ec4de012-e8d7-11e8-3fed-dfe576d3bbe4"
+version = "0.1.0"
+
+[[LatPhysReciprocal]]
+deps = ["LatPhysBase", "LatPhysLatticeConstruction", "LinearAlgebra"]
+git-tree-sha1 = "15282a10d34e75746416f0f1d3c056d345de2c13"
+repo-rev = "master"
+repo-url = "https://github.com/janattig/LatPhysReciprocal.jl"
+uuid = "7a511e88-ebe4-11e8-1bac-67d16a536c98"
+version = "0.1.0"
+
+[[Libdl]]
+uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+
+[[LinearAlgebra]]
+deps = ["Libdl"]
+uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
